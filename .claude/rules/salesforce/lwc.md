@@ -1,0 +1,5 @@
+- Use @wire with Lightning Data Service (getRecord/getFieldValue) before writing Apex controllers.
+- Apex controllers: @AuraEnabled(cacheable=true) for reads, with sharing, try/catch -> AuraHandledException.
+- Handle loading and error states in the template; use lightning-card / SLDS, no custom CSS unless required.
+- Expose via meta XML targets (lightning__RecordPage etc.) with a masterLabel humans can find.
+- Include a Jest test if the spec asks; otherwise document manual verification in ImplementationLog.md.

@@ -1,0 +1,4 @@
+.env
+.sfdx/
+.sf/
+node_modules/

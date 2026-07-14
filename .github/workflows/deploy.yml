@@ -1,0 +1,57 @@
+name: Deploy Pipeline (UAT -> Prod)
+
+on:
+  push:
+    branches: [main]
+    paths: ['force-app/**', '.sf_docs/**']
+  workflow_dispatch:
+    inputs:
+      storyKey:
+        description: 'Story key to deploy (e.g. DEMO-2)'
+        required: true
+
+jobs:
+  deploy-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+      - name: Authenticate UAT
+        run: |
+          echo "${{ secrets.SF_UAT_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url -f auth.txt -a uat && rm auth.txt
+      - name: Resolve manifest
+        id: manifest
+        run: |
+          KEY="${{ github.event.inputs.storyKey }}"
+          if [ -z "$KEY" ]; then
+            KEY=$(git log -1 --pretty=%s | grep -oE '[A-Z]+-[0-9]+' | head -1 || true)
+          fi
+          echo "manifest=.sf_docs/${KEY}/package.xml" >> "$GITHUB_OUTPUT"
+          echo "Deploying story: ${KEY}"
+      - name: Deploy to UAT (with local tests)
+        run: sf project deploy start -x "${{ steps.manifest.outputs.manifest }}" -o uat --test-level RunLocalTests --wait 30
+
+  deploy-prod:
+    needs: deploy-uat
+    runs-on: ubuntu-latest
+    environment: prod   # <-- configure required reviewers on this environment = your approval gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+      - name: Authenticate Prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url -f auth.txt -a prodsim && rm auth.txt
+      - name: Resolve manifest
+        id: manifest
+        run: |
+          KEY="${{ github.event.inputs.storyKey }}"
+          if [ -z "$KEY" ]; then
+            KEY=$(git log -1 --pretty=%s | grep -oE '[A-Z]+-[0-9]+' | head -1 || true)
+          fi
+          echo "manifest=.sf_docs/${KEY}/package.xml" >> "$GITHUB_OUTPUT"
+      - name: Deploy to Prod
+        run: sf project deploy start -x "${{ steps.manifest.outputs.manifest }}" -o prodsim --test-level RunLocalTests --wait 30
